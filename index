@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>منصة الأستاذ مصطفى الجندي - اللغة العربية</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4F46E5">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { cairo: ['Cairo', 'sans-serif'] },
+                    colors: { primary: '#4F46E5', primaryDark: '#3730A3', secondary: '#06B6D4', darkBg: '#0F172A' }
+                }
+            }
+        }
+    </script>
+
+    <!-- Firebase SDK Compat Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #0F172A; }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        .smooth-scroll { -webkit-overflow-scrolling: touch; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .pt-safe { padding-top: env(safe-area-inset-top, 16px); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+        
+        .lesson-btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ===== ملء الشاشة والتدوير على الجوال ===== */
+        #video-container:fullscreen,
+        #video-container:-webkit-full-screen { border-radius: 0; background: #000; }
+
+        /* وضع ملء الشاشة البديل (للآيفون ومتصفحات التطبيقات التي تمنع ملء الشاشة) */
+        #video-container.pseudo-fs {
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            width: 100dvw; height: 100dvw;
+            aspect-ratio: auto; border-radius: 0;
+            z-index: 9999; background: #000;
+        }
+        /* تدوير 90 درجة عندما يكون الجوال بالطول */
+        #video-container.pseudo-fs.rotated {
+            width: 100vh; height: 100vw;
+            width: 100dvh; height: 100dvw;
+            left: 100vw; left: 100dvw;
+            transform: rotate(90deg);
+            transform-origin: top left;
+        }
+        body.fs-lock .smooth-scroll { -webkit-overflow-scrolling: auto; }
+
+        .fs-exit-btn {
+            height: 40px; padding: 0 14px;
+            display: flex; align-items: center; gap: 6px;
+            border-radius: 9999px;
+            background: rgba(220, 38, 38, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            color: #fff; font-size: 13px; font-weight: 800;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .player-tool-btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fs-ctrl-btn {
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 9999px;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="text-slate-100 h-full flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- شاشة تحميل قصيرة أثناء التحقق من تسجيل الدخول المحفوظ -->
+    <div id="boot-splash" class="fixed inset-0 flex items-center justify-center bg-slate-900" style="z-index:60;">
+        <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+    </div>
+
+    <!-- واجهة تسجيل الدخول -->
+    <div id="login-view" class="flex-1 flex flex-col justify-between p-6 h-full bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 pt-safe pb-safe z-50 fixed inset-0">
+        <div class="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full fade-in">
+            <div class="relative mb-4">
+                <div class="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-indigo-500 via-cyan-400 to-indigo-700 shadow-2xl shadow-indigo-500/30 overflow-hidden flex items-center justify-center bg-slate-800">
+                    <div class="text-3xl font-black text-indigo-400">ض</div>
+                </div>
+                <span class="absolute bottom-1 right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-slate-900"></span>
+            </div>
+
+            <h1 class="text-xl font-black text-white text-center tracking-wide">منصة اللغة العربية</h1>
+            <p class="text-indigo-400 text-xs mt-0.5 text-center font-bold">الأستاذ مصطفى الجندي</p>
+
+            <form id="login-form" class="w-full space-y-3.5 mt-8" onsubmit="handleLogin(event)">
+                <div>
+                    <input type="text" id="login-username" required placeholder="البريد الإلكتروني / اسم الطالب" 
+                        class="w-full px-4 py-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs transition-all">
+                </div>
+                <div>
+                    <input type="password" id="login-password" required placeholder="كلمة المرور / كود الدخول" 
+                        class="w-full px-4 py-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs transition-all">
+                </div>
+                <button type="submit" id="btn-login-submit"
+                    class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold py-3 rounded-2xl shadow-lg shadow-indigo-600/30 transition-all text-xs mt-2 flex items-center justify-center gap-2">
+                    <span>دخول المنصة</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- الواجهة الرئيسية -->
+    <div id="app-view" class="hidden flex-1 flex flex-col h-full bg-slate-900 overflow-hidden">
+        <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 pt-safe flex items-center justify-between z-30 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 shadow-md">ض</div>
+                <div>
+                    <h2 class="text-sm font-black text-white leading-tight">الأستاذ مصطفى الجندي</h2>
+                    <p class="text-[10px] text-indigo-400 font-semibold">مادة اللغة العربية</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div id="role-badge" class="bg-slate-800 border border-slate-700/60 px-3 py-1 rounded-full text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="user-greeting">طالب</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="scroll-container" class="flex-1 overflow-y-auto smooth-scroll pb-20">
+            <!-- تبويب الدروس -->
+            <div id="tab-lessons" class="tab-content max-w-4xl mx-auto w-full">
+                <!-- شاشة المشغل الثابتة المجهزة للهواتف الذكية -->
+                <div id="video-container" class="bg-black relative aspect-video w-full shadow-2xl z-10 flex items-center justify-center overflow-hidden rounded-b-2xl">
+                    <div id="no-video-selected" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-4 text-center z-10">
+                        <div class="w-12 h-12 rounded-full bg-indigo-950/80 border border-indigo-500/30 flex items-center justify-center mb-2 text-indigo-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xs font-bold text-slate-200">اختر درساً للمشاهدة</h3>
+                    </div>
+
+                    <!-- عنصر iframe الثابت المجهز مسبقاً لتفادي حظر متصفحات الجوال -->
+                    <iframe id="main-iframe" src="about:blank" class="hidden w-full h-full border-0 absolute inset-0 z-20" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowfullscreen="true"></iframe>
+                    
+                    <!-- عنصر video الثابت للملفات المباشرة MP4 -->
+                    <video id="main-video" controls class="hidden w-full h-full object-contain absolute inset-0 z-20" controlsList="nodownload" playsinline allowfullscreen></video>
+
+                    <!-- أزرار التحكم تظهر في أي وضع من أوضاع ملء الشاشة -->
+                    <div id="fs-controls" class="hidden absolute z-40" style="top:10px; right:10px;">
+                        <div class="flex items-center gap-2">
+                            <button id="fs-rotate-btn" type="button" onclick="rotatePlayer()" class="fs-ctrl-btn" aria-label="تدوير الشاشة">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </button>
+                            <button type="button" onclick="exitFullscreen()" class="fs-exit-btn" aria-label="خروج من ملء الشاشة">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <span>خروج</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- شريط أدوات المشغل -->
+                <div id="player-tools" class="hidden">
+                    <div class="flex items-center justify-end gap-2 px-4 py-2 bg-slate-900 border-b border-slate-800">
+                        <button type="button" onclick="enterFullscreen()" class="player-tool-btn flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl active:bg-slate-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                            <span>تكبير الشاشة</span>
+                        </button>
+                        <button type="button" onclick="rotatePlayer()" class="player-tool-btn flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl active:bg-slate-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            <span>تدوير الشاشة</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="video-details" class="p-4 bg-slate-800/40 border-b border-slate-800 hidden fade-in">
+                    <div class="flex items-start justify-between gap-3">
+                        <h2 id="video-title" class="text-base font-bold text-white leading-snug"></h2>
+                        <button id="mark-complete-btn" onclick="toggleLessonCompletion()" class="bg-slate-800 border border-slate-700 text-slate-300 text-xs px-3 py-1 rounded-xl flex items-center gap-1.5 shrink-0">
+                            <span id="complete-icon">✓</span>
+                            <span id="complete-text">مكتمل</span>
+                        </button>
+                    </div>
+                    <p id="video-description" class="text-slate-300 text-xs mt-2.5 leading-relaxed bg-slate-900/50 p-3 rounded-xl border border-slate-800/80"></p>
+                </div>
+
+                <div class="p-4 pb-6">
+                    <div id="admin-add-folder-btn" class="hidden mb-4">
+                        <button onclick="openFolderModal()" class="w-full bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-2">
+                            <span>+ إضافة مجلد/وحدة جديدة (أدمن)</span>
+                        </button>
+                    </div>
+                    <div id="folders-list" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- تبويب الملازم -->
+            <div id="tab-guides" class="tab-content hidden p-4 max-w-4xl mx-auto w-full">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-white">الملازم والملخصات</h3>
+                    <button id="admin-add-guide-btn" onclick="openGuideModal()" class="hidden bg-indigo-600 text-white text-xs px-3 py-2 rounded-xl font-bold">
+                        + إضافة ملزمة
+                    </button>
+                </div>
+                <div id="guides-list" class="space-y-3"></div>
+            </div>
+
+            <!-- تبويب حسابي -->
+            <div id="tab-profile" class="tab-content hidden p-4 max-w-4xl mx-auto w-full">
+                <div class="bg-slate-800/50 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
+                    <div class="w-16 h-16 rounded-full bg-indigo-600 text-white font-black text-xl flex items-center justify-center mx-auto shadow-lg">ض</div>
+                    <div>
+                        <h3 id="profile-name" class="text-base font-bold text-white"></h3>
+                        <p id="profile-role" class="text-xs text-indigo-400 font-semibold mt-0.5"></p>
+                    </div>
+                </div>
+
+                <button type="button" onclick="confirmLogout()" class="w-full mt-4 flex items-center justify-center gap-2 bg-rose-600/15 border border-rose-500/40 text-rose-300 font-bold py-3 rounded-2xl text-sm active:bg-rose-600/30" style="touch-action:manipulation;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    <span>تسجيل الخروج</span>
+                </button>
+            </div>
+
+            <!-- تبويب الأدمن -->
+            <div id="tab-admin" class="tab-content hidden p-4 space-y-4 max-w-4xl mx-auto w-full">
+                <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4">
+                    <h3 class="text-sm font-bold text-indigo-300 mb-2">إضافة طالب جديد</h3>
+                    <form onsubmit="handleAddStudent(event)" class="space-y-3">
+                        <input type="text" id="new-student-name" required placeholder="اسم الطالب" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white">
+                        <input type="text" id="new-student-code" required placeholder="البريد / الكود" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all">حفظ</button>
+                    </form>
+                </div>
+                <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-4">
+                    <h3 class="text-sm font-bold text-slate-200 mb-3">الطلاب المسجلين</h3>
+                    <div id="admin-students-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-4 py-2 flex justify-around items-center shrink-0 z-30 fixed bottom-0 left-0 right-0">
+            <button onclick="switchTab('lessons')" id="nav-lessons" class="flex flex-col items-center gap-1 text-indigo-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
+                </svg>
+                <span class="text-[10px] font-bold">الدروس</span>
+            </button>
+            <button onclick="switchTab('guides')" id="nav-guides" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span class="text-[10px] font-bold">الملازم</span>
+            </button>
+            <button onclick="switchTab('profile')" id="nav-profile" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span class="text-[10px] font-bold">حسابي</span>
+            </button>
+            <button id="admin-nav-btn" onclick="switchTab('admin')" class="hidden flex flex-col items-center gap-1 text-rose-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                </svg>
+                <span class="text-[10px] font-bold">الأدمن</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-folder" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4">
+            <h3 class="text-sm font-bold text-white">إضافة مجلد جديد</h3>
+            <input type="text" id="folder-name-input" placeholder="اسم المجلد" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white">
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeModal('modal-folder')" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl font-bold">إلغاء</button>
+                <button onclick="saveFolder()" class="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-bold">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-video" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-3">
+            <h3 class="text-sm font-bold text-white">إضافة درس جديد</h3>
+            <input type="hidden" id="video-folder-key">
+            <input type="text" id="video-title-input" placeholder="عنوان الدرس" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white">
+            <input type="text" id="video-url-input" placeholder="رابط الفيديو" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white">
+            <input type="text" id="video-duration-input" placeholder="المدة (اختياري)" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white">
+            <textarea id="video-desc-input" placeholder="الوصف" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white h-20"></textarea>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeModal('modal-video')" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl font-bold">إلغاء</button>
+                <button onclick="saveVideo()" class="px-4 py-2 bg-indigo-600 text-white text-xs rounded-xl font-bold">حفظ الدرس</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة منبثقة أنيقة لتأكيد تسجيل الخروج -->
+    <div id="modal-logout-confirm" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xs text-center space-y-4 shadow-2xl fade-in">
+            <div class="w-12 h-12 rounded-full bg-rose-600/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-white">تسجيل الخروج</h3>
+                <p class="text-xs text-slate-400 mt-1">هل أنت متأكد أنك تريد تسجيل الخروج من المنصة؟</p>
+            </div>
+            <div class="flex gap-2 pt-1">
+                <button onclick="closeModal('modal-logout-confirm')" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl font-bold transition-all">إلغاء</button>
+                <button onclick="handleLogout()" class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs rounded-xl font-bold shadow-lg shadow-rose-600/30 transition-all">نعم، متأكد</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnmVWUZXwNMNpxVUSo-dgObWuqN573VXs",
+            authDomain: "mustafa-eljundi-platform.firebaseapp.com",
+            databaseURL: "https://mustafa-eljundi-platform-default-rtdb.firebaseio.com",
+            projectId: "mustafa-eljundi-platform",
+            storageBucket: "mustafa-eljundi-platform.firebasestorage.app",
+            messagingSenderId: "154546100615",
+            appId: "1:154546100615:web:600b95420b28b07105db22",
+            measurementId: "G-W6GGMSL45H"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        let state = {
+            user: null,
+            userEmail: null,
+            isAdmin: false,
+            activeVideo: null,
+            folders: {},
+            guides: {},
+            students: {},
+            studentProgress: {}
+        };
+
+        function initFirebaseListeners() {
+            if (state.listenersStarted) return;
+            state.listenersStarted = true;
+            db.ref('course_folders').on('value', snapshot => {
+                const val = snapshot.val();
+                if (!val) {
+                    const firstFolderId = 'f_default_1';
+                    db.ref(`course_folders/${firstFolderId}`).set({ folderName: 'الدرس الأول', videos: {} });
+                } else {
+                    state.folders = val;
+                    renderFoldersList();
+                }
+            }, err => console.error("Firebase Error:", err));
+
+            db.ref('study_guides').on('value', snapshot => {
+                state.guides = snapshot.val() || {};
+                renderGuidesList();
+            });
+
+            if (state.isAdmin) {
+                db.ref('students').on('value', snapshot => {
+                    state.students = snapshot.val() || {};
+                    renderAdminStudentsList();
+                });
+            }
+
+            if (state.user && !state.isAdmin) {
+                const userKey = state.userEmail ? state.userEmail.replace(/[\.\#\$\[\]]/g, '_') : state.user;
+                db.ref(`students_progress/${userKey}`).on('value', snapshot => {
+                    state.studentProgress = snapshot.val() || {};
+                    renderFoldersList();
+                });
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-username').value.trim().toLowerCase();
+            const p = document.getElementById('login-password').value.trim();
+
+            if (u === 'koki' || u === 'koki@admin.com') {
+                const adminEmail = 'koki@admin.com';
+                const adminPass = p || 'koki123';
+                
+                auth.signInWithEmailAndPassword(adminEmail, adminPass)
+                    .then(() => {
+                        state.user = 'koki';
+                        state.userEmail = adminEmail;
+                        state.isAdmin = true;
+                        completeLogin();
+                    }).catch(() => {
+                        auth.createUserWithEmailAndPassword(adminEmail, adminPass)
+                            .then(() => {
+                                state.user = 'koki';
+                                state.userEmail = adminEmail;
+                                state.isAdmin = true;
+                                completeLogin();
+                            }).catch(err => alert('خطأ: ' + err.message));
+                    });
+            } else {
+                db.ref('students').once('value').then(snapshot => {
+                    const studentsData = snapshot.val() || {};
+                    const studentList = Object.values(studentsData);
+                    const found = studentList.find(s => (s.email && s.email.toLowerCase() === u) || (s.name && s.name.toLowerCase() === u));
+
+                    if (found && (found.code === p || found.password === p)) {
+                        state.user = found.name;
+                        state.userEmail = found.email || found.name;
+                        state.isAdmin = found.role === 'admin';
+                        completeLogin();
+                    } else {
+                        alert('بيانات الدخول غير صحيحة!');
+                    }
+                });
+            }
+        }
+
+        function setupUIForRole() {
+            document.getElementById('user-greeting').innerText = state.isAdmin ? 'الأدمن (koki)' : state.user;
+            document.getElementById('profile-name').innerText = state.user;
+            document.getElementById('profile-role').innerText = state.isAdmin ? 'المشرف العام' : 'طالب';
+
+            if (state.isAdmin) {
+                document.getElementById('admin-add-folder-btn').classList.remove('hidden');
+                document.getElementById('admin-add-guide-btn').classList.remove('hidden');
+                document.getElementById('admin-nav-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('admin-add-folder-btn').classList.add('hidden');
+                document.getElementById('admin-add-guide-btn').classList.add('hidden');
+                document.getElementById('admin-nav-btn').classList.add('hidden');
+            }
+
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            initFirebaseListeners();
+        }
+
+        /* ===== حفظ وجلب وتسجيل الخروج من الجلسة بأمان ===== */
+        const SESSION_KEY = 'mj_platform_session_v1';
+        const ADMIN_EMAIL = 'koki@admin.com';
+
+        function saveSession() {
+            try {
+                localStorage.setItem(SESSION_KEY, JSON.stringify({
+                    user: state.user,
+                    userEmail: state.userEmail,
+                    viaFirebase: state.userEmail === ADMIN_EMAIL
+                }));
+            } catch (e) {
+                console.warn("localStorage is not available:", e);
+            }
+        }
+
+        function readSession() {
+            try { 
+                return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); 
+            } catch (e) { 
+                return null; 
+            }
+        }
+
+        function clearSession() {
+            try { 
+                localStorage.removeItem(SESSION_KEY); 
+            } catch (e) {}
+        }
+
+        function completeLogin() {
+            saveSession();
+            setupUIForRole();
+        }
+
+        function hideSplash() {
+            const el = document.getElementById('boot-splash');
+            if (el) el.remove();
+        }
+
+        function restoreSession() {
+            const saved = readSession();
+            let handled = false;
+            let unsubscribe = null;
+
+            // مؤقت زمني إلزامي لإزالة الشاشة البيضاء مهما كانت الظروف (بعد 3 ثوانٍ كحد أقصى)
+            const safetyTimer = setTimeout(() => {
+                if (!handled) {
+                    handled = true;
+                    hideSplash();
+                    if (unsubscribe) unsubscribe();
+                }
+            }, 3000);
+
+            unsubscribe = auth.onAuthStateChanged(fbUser => {
+                if (handled) return;
+                handled = true;
+                clearTimeout(safetyTimer);
+                if (unsubscribe) unsubscribe();
+                if (state.user) { hideSplash(); return; }
+
+                if (fbUser && fbUser.email === ADMIN_EMAIL) {
+                    state.user = 'koki';
+                    state.userEmail = ADMIN_EMAIL;
+                    state.isAdmin = true;
+                    setupUIForRole();
+                    hideSplash();
+                    return;
+                }
+
+                if (saved && saved.user && !saved.viaFirebase) {
+                    db.ref('students').once('value').then(snapshot => {
+                        const list = Object.values(snapshot.val() || {});
+                        const key = String(saved.userEmail || saved.user).toLowerCase();
+                        const found = list.find(s => (s.email && s.email.toLowerCase() === key) || (s.name && s.name.toLowerCase() === key));
+                        if (found) {
+                            if (!state.user) {
+                                state.user = found.name;
+                                state.userEmail = found.email || found.name;
+                                state.isAdmin = found.role === 'admin';
+                                setupUIForRole();
+                            }
+                        } else {
+                            clearSession();
+                        }
+                        hideSplash();
+                    }).catch(() => hideSplash());
+                    return;
+                }
+
+                hideSplash();
+            });
+        }
+
+        function confirmLogout() {
+            document.getElementById('modal-logout-confirm').classList.remove('hidden');
+        }
+
+        function handleLogout() {
+            clearSession();
+            auth.signOut().catch(() => {}).then(() => location.reload());
+        }
+
+        function switchTab(tabName) {
+            if (tabName === 'admin' && !state.isAdmin) return;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('text-indigo-400'));
+            document.getElementById(`nav-${tabName}`).classList.add('text-indigo-400');
+        }
+
+        function renderFoldersList() {
+            const container = document.getElementById('folders-list');
+            container.innerHTML = '';
+            const folderKeys = Object.keys(state.folders);
+
+            if (folderKeys.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-slate-400 text-xs">لا توجد دروس.</div>';
+                return;
+            }
+
+            folderKeys.forEach((fKey) => {
+                const folder = state.folders[fKey];
+                const box = document.createElement('div');
+                box.className = 'bg-slate-800/30 border border-slate-800 rounded-2xl p-3 space-y-2';
+
+                let videosHtml = '';
+                const videosData = folder.videos || {};
+
+                Object.keys(videosData).forEach((vKey) => {
+                    const vid = videosData[vKey];
+                    const isSelected = state.activeVideo && state.activeVideo.id === vid.id;
+                    const isCompleted = state.studentProgress[vid.id];
+
+                    videosHtml += `
+                        <button type="button" onclick="playVideo('${fKey}', '${vKey}')" class="lesson-btn w-full text-right p-3 rounded-xl border ${isSelected ? 'border-indigo-500 bg-indigo-900/60' : 'border-slate-800/80 bg-slate-800/60 active:bg-slate-700'} flex items-center justify-between cursor-pointer transition-all my-1.5 focus:outline-none">
+                            <div class="flex items-center gap-2 min-w-0 pointer-events-none">
+                                <span class="text-xs font-bold ${isSelected ? 'text-indigo-400' : 'text-slate-200'} truncate">${vid.title}</span>
+                                ${isCompleted ? '<span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">مكتمل</span>' : ''}
+                            </div>
+                            <span class="text-[10px] text-slate-400 font-mono pointer-events-none">${vid.duration || ''}</span>
+                        </button>
+                    `;
+                });
+
+                box.innerHTML = `
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-800 text-xs font-bold text-indigo-400">
+                        <span>${folder.folderName}</span>
+                        ${state.isAdmin ? `<button onclick="openVideoModal('${fKey}')" class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded">+ إضافة درس</button>` : ''}
+                    </div>
+                    <div class="space-y-1.5 mt-2">${videosHtml || '<p class="text-[10px] text-slate-500">لا يوجد دروس بعد</p>'}</div>
+                `;
+                container.appendChild(box);
+            });
+        }
+
+        function playVideo(fKey, vKey) {
+            if (state.folders[fKey] && state.folders[fKey].videos && state.folders[fKey].videos[vKey]) {
+                const vid = state.folders[fKey].videos[vKey];
+                loadVideoIntoPlayer(vid);
+                renderFoldersList();
+                
+                const scrollElem = document.getElementById('scroll-container');
+                if (scrollElem) scrollElem.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function formatVideoUrl(rawUrl) {
+            if (!rawUrl) return { isIframe: false, src: '' };
+            let url = rawUrl.trim();
+
+            if (url.includes('<iframe')) {
+                const match = url.match(/src=["']([^"']+)["']/i);
+                if (match && match[1]) url = match[1];
+            }
+
+            const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/i);
+            if (ytMatch && ytMatch[1]) {
+                return {
+                    isIframe: true,
+                    src: `https://www.youtube.com/embed/${ytMatch[1]}?enablejsapi=1&rel=0&modestbranding=1&controls=1&fs=1&playsinline=1`
+                };
+            }
+
+            if (url.includes('iframe') || url.includes('embed') || url.includes('mediadelivery') || url.includes('player.')) {
+                return { isIframe: true, src: url };
+            }
+
+            return { isIframe: false, src: url };
+        }
+
+        function loadVideoIntoPlayer(vid) {
+            state.activeVideo = vid;
+            const noVidPlaceholder = document.getElementById('no-video-selected');
+            const mainIframe = document.getElementById('main-iframe');
+            const mainVideo = document.getElementById('main-video');
+            
+            const parsed = formatVideoUrl(vid.url);
+            noVidPlaceholder.classList.add('hidden');
+
+            if (parsed.isIframe) {
+                mainVideo.pause();
+                mainVideo.classList.add('hidden');
+                
+                mainIframe.src = parsed.src;
+                mainIframe.classList.remove('hidden');
+            } else {
+                mainIframe.src = "about:blank";
+                mainIframe.classList.add('hidden');
+
+                mainVideo.src = parsed.src;
+                mainVideo.classList.remove('hidden');
+                mainVideo.play().catch(e => console.log('Autoplay prevented on mobile', e));
+            }
+
+            document.getElementById('player-tools').classList.remove('hidden');
+            document.getElementById('video-details').classList.remove('hidden');
+            document.getElementById('video-title').innerText = vid.title;
+            document.getElementById('video-description').innerText = vid.desc || 'لا يوجد وصف متاح لهذا الدرس';
+        }
+
+        /* ===== ملء الشاشة وتدوير الشاشة على الجوال ===== */
+        const fsState = { pseudo: false, rotated: false, historyPushed: false };
+
+        function getNativeFsElement() {
+            return document.fullscreenElement || document.webkitFullscreenElement || null;
+        }
+
+        function isBoxNativeFs() {
+            return getNativeFsElement() === document.getElementById('video-container');
+        }
+
+        function showFsControls(withRotate) {
+            document.getElementById('fs-controls').classList.remove('hidden');
+            document.getElementById('fs-rotate-btn').style.display = withRotate ? 'flex' : 'none';
+        }
+
+        function hideFsControls() {
+            document.getElementById('fs-controls').classList.add('hidden');
+        }
+
+        function lockLandscape() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(() => {});
+                }
+            } catch (e) {}
+        }
+
+        function unlockOrientation() {
+            try {
+                if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+            } catch (e) {}
+        }
+
+        function pushFsHistory() {
+            if (fsState.historyPushed) return;
+            try { history.pushState({ fs: true }, ''); fsState.historyPushed = true; } catch (e) {}
+        }
+
+        function popFsHistory() {
+            if (!fsState.historyPushed) return;
+            fsState.historyPushed = false;
+            if (history.state && history.state.fs) {
+                try { history.back(); } catch (e) {}
+            }
+        }
+
+        function exitNativeFs() {
+            const exitFn = document.exitFullscreen || document.webkitExitFullscreen;
+            if (getNativeFsElement() && exitFn) {
+                try {
+                    const r = exitFn.call(document);
+                    if (r && r.catch) r.catch(() => {});
+                } catch (e) {}
+            }
+        }
+
+        async function enterFullscreen() {
+            if (fsState.pseudo || getNativeFsElement()) return;
+            const box = document.getElementById('video-container');
+            const video = document.getElementById('main-video');
+            const nativeSupported = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+            const requestFs = box.requestFullscreen || box.webkitRequestFullscreen;
+
+            if (nativeSupported && requestFs) {
+                try {
+                    await requestFs.call(box);
+                    await new Promise(r => setTimeout(r, 250));
+                    if (isBoxNativeFs()) { lockLandscape(); return; }
+                } catch (e) {}
+            }
+
+            if (!video.classList.contains('hidden') && video.webkitEnterFullscreen) {
+                try { video.webkitEnterFullscreen(); return; } catch (e) {}
+            }
+
+            enterPseudoFullscreen();
+        }
+
+        function enterPseudoFullscreen() {
+            const box = document.getElementById('video-container');
+            fsState.pseudo = true;
+            fsState.rotated = window.innerHeight > window.innerWidth;
+            box.classList.add('pseudo-fs');
+            box.classList.toggle('rotated', fsState.rotated);
+            document.body.classList.add('fs-lock');
+            showFsControls(true);
+            pushFsHistory();
+        }
+
+        function exitPseudoFullscreen() {
+            if (!fsState.pseudo) return;
+            const box = document.getElementById('video-container');
+            fsState.pseudo = false;
+            fsState.rotated = false;
+            box.classList.remove('pseudo-fs', 'rotated');
+            document.body.classList.remove('fs-lock');
+            hideFsControls();
+        }
+
+        function exitFullscreen() {
+            exitNativeFs();
+            exitPseudoFullscreen();
+            if (!getNativeFsElement()) hideFsControls();
+            unlockOrientation();
+            popFsHistory();
+        }
+
+        function rotatePlayer() {
+            if (isBoxNativeFs()) return;
+            if (!fsState.pseudo) {
+                enterPseudoFullscreen();
+                return;
+            }
+            fsState.rotated = !fsState.rotated;
+            document.getElementById('video-container').classList.toggle('rotated', fsState.rotated);
+        }
+
+        function onNativeFsChange() {
+            if (isBoxNativeFs()) {
+                showFsControls(false);
+                pushFsHistory();
+            } else if (!getNativeFsElement()) {
+                if (!fsState.pseudo) { hideFsControls(); popFsHistory(); }
+                unlockOrientation();
+            }
+        }
+        ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, onNativeFsChange));
+
+        window.addEventListener('popstate', () => {
+            fsState.historyPushed = false;
+            exitPseudoFullscreen();
+            exitNativeFs();
+            unlockOrientation();
+        });
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fsState.pseudo) exitFullscreen(); });
+
+        const portraitQuery = window.matchMedia('(orientation: portrait)');
+        const onOrientationChange = () => {
+            if (!fsState.pseudo) return;
+            fsState.rotated = portraitQuery.matches;
+            document.getElementById('video-container').classList.toggle('rotated', fsState.rotated);
+        };
+        if (portraitQuery.addEventListener) portraitQuery.addEventListener('change', onOrientationChange);
+        else if (portraitQuery.addListener) portraitQuery.addListener(onOrientationChange);
+
+        function toggleLessonCompletion() {
+            if (!state.activeVideo || state.isAdmin) return;
+            const vidId = state.activeVideo.id;
+            const current = state.studentProgress[vidId];
+            const userKey = state.userEmail ? state.userEmail.replace(/[\.\#\$\[\]]/g, '_') : state.user;
+            db.ref(`students_progress/${userKey}/${vidId}`).set(!current);
+        }
+
+        function openFolderModal() { if(state.isAdmin) document.getElementById('modal-folder').classList.remove('hidden'); }
+        function openVideoModal(fKey) { if(state.isAdmin) { document.getElementById('video-folder-key').value = fKey; document.getElementById('modal-video').classList.remove('hidden'); } }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function saveFolder() {
+            if(!state.isAdmin) return;
+            const name = document.getElementById('folder-name-input').value.trim();
+            if (name) {
+                db.ref(`course_folders/f_${Date.now()}`).set({ folderName: name, videos: {} });
+                closeModal('modal-folder');
+                document.getElementById('folder-name-input').value = '';
+            }
+        }
+
+        function saveVideo() {
+            if(!state.isAdmin) return;
+            const fKey = document.getElementById('video-folder-key').value;
+            const title = document.getElementById('video-title-input').value.trim();
+            const url = document.getElementById('video-url-input').value.trim();
+            const duration = document.getElementById('video-duration-input').value.trim();
+            const desc = document.getElementById('video-desc-input').value.trim();
+
+            if (title && url && fKey) {
+                const vId = 'v_' + Date.now();
+                db.ref(`course_folders/${fKey}/videos/${vId}`).set({ id: vId, title, url, duration, desc }).then(() => {
+                    closeModal('modal-video');
+                    document.getElementById('video-title-input').value = '';
+                    document.getElementById('video-url-input').value = '';
+                    document.getElementById('video-duration-input').value = '';
+                    document.getElementById('video-desc-input').value = '';
+                });
+            } else {
+                alert('يرجى كتابة عنوان الدرس ورابط الفيديو!');
+            }
+        }
+
+        function handleAddStudent(e) {
+            e.preventDefault();
+            if(!state.isAdmin) return;
+            const name = document.getElementById('new-student-name').value.trim();
+            const code = document.getElementById('new-student-code').value.trim();
+            if (name && code) {
+                db.ref(`students/std_${Date.now()}`).set({ 
+                    name, email: code.includes('@') ? code : `${name}@student.com`, code, password: code, role: 'student' 
+                }).then(() => {
+                    alert(`تمت إضافة الطالب!\nالاسم: ${name}\nالكود: ${code}`);
+                    document.getElementById('new-student-name').value = ''; document.getElementById('new-student-code').value = '';
+                });
+            }
+        }
+
+        function renderAdminStudentsList() {
+            const container = document.getElementById('admin-students-list');
+            container.innerHTML = '';
+            Object.values(state.students).forEach(s => {
+                container.innerHTML += `<div class="p-2 bg-slate-800 rounded-xl text-xs flex justify-between items-center"><div><div class="text-white font-bold">${s.name}</div><div class="text-[10px] text-slate-400">${s.email || ''}</div></div><span class="text-indigo-400 font-mono">${s.code || s.password}</span></div>`;
+            });
+        }
+
+        function renderGuidesList() {
+            const container = document.getElementById('guides-list');
+            container.innerHTML = '';
+            Object.values(state.guides).forEach(g => {
+                container.innerHTML += `<div class="p-3 bg-slate-800/40 border border-slate-800 rounded-xl flex justify-between items-center"><span class="text-xs text-white font-bold">${g.title}</span><a href="${g.url}" target="_blank" class="text-xs bg-indigo-600 px-3 py-1 rounded-lg font-bold">تحميل</a></div>`;
+            });
+        }
+
+        restoreSession();
+    </script>
+</body>
+</html>
